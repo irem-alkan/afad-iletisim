@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AFAD İletişim</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+
+        input, button {
+            padding: 10px;
+            margin: 5px;
+        }
+
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        li {
+            padding: 5px;
+            background: #f4f4f4;
+            margin: 5px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>AFAD Telsiz Uygulaması</h1>
+
+    <!-- Kullanıcı adı ve oda adı girişi -->
+    <input type="text" id="kullaniciAdi" placeholder="Adınızı girin...">
+    <input type="text" id="odaAdi" placeholder="Oda (mahalle/ekip) adı...">
+    <button onclick="baglan()">Bağlan</button>
+
+    <!-- Sohbet bölümü -->
+    <div id="chat" style="display: none;">
+        <input type="text" id="mesaj" placeholder="Mesajınızı yazın...">
+        <button onclick="mesajGonder()">Gönder</button>
+        <button onclick="konumGonder()">Konum Gönder</button>
+
+        <h3>Gelen Mesajlar:</h3>
+        <ul id="mesajlar"></ul>
+    </div>
+
+    <script>
+        const socket = io("http://192.168.1.72:3000"); // Sunucu adresin
+        let oda = "";
+        let kullanici = "";
+
+        function baglan() {
+            oda = document.getElementById("odaAdi").value;
+            kullanici = document.getElementById("kullaniciAdi").value;
+
+            if (!oda || !kullanici) {
+                alert("Lütfen adınızı ve oda adını girin.");
+                return;
+            }
+
+            socket.emit("oda_katil", oda);
+            document.getElementById("chat").style.display = "block";
+        }
+
+        function mesajGonder() {
+            const mesaj = document.getElementById("mesaj").value;
+            if (!mesaj) return;
+
+            socket.emit("mesaj_gonder", {
+                oda,
+                kullanici,
+                mesaj
+            });
+
+            document.getElementById("mesaj").value = "";
+        }
+
+        function konumGonder() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    const konum = {
+                        oda,
+                        enlem: position.coords.latitude,
+                        boylam: position.coords.longitude
+                    };
+                    socket.emit("konum_gonder", konum);
+                    alert(`Konum gönderildi: Enlem ${konum.enlem}, Boylam ${konum.boylam}`);
+                });
+            } else {
+                alert("Konum servisi desteklenmiyor.");
+            }
+        }
+
+        socket.on("mesaj_al", data => {
+            const li = document.createElement("li");
+            li.textContent = `${data.kullanici}: ${data.mesaj}`;
+            document.getElementById("mesajlar").appendChild(li);
+        });
+
+        socket.on("konum_al", konum => {
+            const li = document.createElement("li");
+            li.textContent = `📍 Konum alındı: Enlem ${konum.enlem}, Boylam ${konum.boylam}`;
+            document.getElementById("mesajlar").appendChild(li);
+        });
+
+        socket.on("sistem_mesaji", (msg) => {
+            const li = document.createElement("li");
+            li.textContent = `🔔 ${msg}`;
+            li.style.fontStyle = "italic";
+            document.getElementById("mesajlar").appendChild(li);
+        });
+    </script>
+</body>
+</html>
